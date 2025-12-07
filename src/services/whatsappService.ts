@@ -45,6 +45,42 @@ export const qrCodes = new Map<string, string>();
 const retryCounters = new Map<string, number>();
 
 /**
+ * Helper: Get message type from Message object
+ */
+function getMessageType(message: unknown): string {
+  if (!message || typeof message !== 'object') return 'unknown';
+  const msg = message as Record<string, unknown>;
+  
+  if (msg.conversation || msg.extendedTextMessage) return 'text';
+  if (msg.imageMessage) return 'image';
+  if (msg.videoMessage) return 'video';
+  if (msg.audioMessage) return 'audio';
+  if (msg.documentMessage) return 'document';
+  if (msg.stickerMessage) return 'sticker';
+  if (msg.contactMessage) return 'contact';
+  if (msg.locationMessage) return 'location';
+  if (msg.reactionMessage) return 'reaction';
+  if (msg.pollCreationMessage) return 'poll';
+  return 'unknown';
+}
+
+/**
+ * Helper: Get human-readable status name from status code
+ * Status codes from Baileys: 0=ERROR, 1=PENDING, 2=SERVER_ACK, 3=DELIVERY_ACK, 4=READ, 5=PLAYED
+ */
+function getStatusName(status: number | undefined): string {
+  switch (status) {
+    case 0: return 'error';
+    case 1: return 'pending';
+    case 2: return 'sent';       // Server acknowledged
+    case 3: return 'delivered';  // Delivered to recipient
+    case 4: return 'read';       // Read by recipient
+    case 5: return 'played';     // Played (for audio/video)
+    default: return 'unknown';
+  }
+}
+
+/**
  * Check if a session exists and is connected
  */
 export function isSessionConnected(sessionId: string): boolean {
@@ -135,13 +171,69 @@ export async function createSession(
     // Save credentials when updated
     socket.ev.on('creds.update', saveCreds);
 
-    // Handle messages (optional - for webhook)
+    // Handle incoming messages
     socket.ev.on('messages.upsert', async (m) => {
+      // Format messages for webhook
+      const messages = m.messages.map((msg) => ({
+        id: msg.key.id,
+        from: msg.key.remoteJid,
+        fromMe: msg.key.fromMe,
+        timestamp: msg.messageTimestamp,
+        type: getMessageType(msg.message),
+        text: msg.message?.conversation || 
+              msg.message?.extendedTextMessage?.text ||
+              msg.message?.imageMessage?.caption ||
+              msg.message?.videoMessage?.caption ||
+              msg.message?.documentMessage?.caption || null,
+        pushName: msg.pushName,
+        hasMedia: !!(msg.message?.imageMessage || msg.message?.videoMessage || 
+                     msg.message?.audioMessage || msg.message?.documentMessage ||
+                     msg.message?.stickerMessage),
+      }));
+
+      // Send webhook if configured
       if (session.webhook_url) {
         await sendWebhook(session.webhook_url, {
-          event: 'messages.upsert',
+          event: 'message.received',
           sessionId,
-          data: m,
+          timestamp: new Date().toISOString(),
+          data: {
+            type: m.type,
+            messages,
+          },
+        });
+      }
+    });
+
+    // Handle message status updates (sent, delivered, read)
+    socket.ev.on('messages.update', async (updates) => {
+      const statusUpdates = updates.map((update) => ({
+        id: update.key.id,
+        remoteJid: update.key.remoteJid,
+        fromMe: update.key.fromMe,
+        status: getStatusName(update.update?.status ?? undefined),
+        statusCode: update.update?.status ?? undefined,
+      }));
+
+      // Send webhook if configured
+      if (session.webhook_url) {
+        await sendWebhook(session.webhook_url, {
+          event: 'message.status',
+          sessionId,
+          timestamp: new Date().toISOString(),
+          data: statusUpdates,
+        });
+      }
+    });
+
+    // Handle presence updates (online/offline, typing)
+    socket.ev.on('presence.update', async (presence) => {
+      if (session.webhook_url) {
+        await sendWebhook(session.webhook_url, {
+          event: 'presence.update',
+          sessionId,
+          timestamp: new Date().toISOString(),
+          data: presence,
         });
       }
     });
