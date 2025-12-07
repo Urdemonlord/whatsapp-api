@@ -14,6 +14,17 @@ import {
   listSessionsHandler,
   sendMessageHandler,
 } from '../controllers/sessionController';
+import {
+  sendToGroupHandler,
+  broadcastHandler,
+  listGroupsHandler,
+  createGroupHandler,
+  getGroupInfoHandler,
+  addGroupParticipantsHandler,
+  removeGroupParticipantsHandler,
+  leaveGroupHandler,
+  updateWebhookHandler,
+} from '../controllers/groupController';
 
 /**
  * Register session routes
@@ -25,6 +36,10 @@ export async function sessionRoutes(
   // Apply API key authentication to all routes in this plugin
   fastify.addHook('preHandler', apiKeyAuth);
 
+  // ========================================
+  // SESSION MANAGEMENT
+  // ========================================
+
   // Create new session
   fastify.post('/session/create', createSessionHandler);
 
@@ -32,29 +47,51 @@ export async function sessionRoutes(
   fastify.get('/sessions', listSessionsHandler);
 
   // Get session status
-  fastify.get<{ Params: { sessionId: string } }>(
-    '/session/:sessionId/status',
-    getSessionStatusHandler
-  );
+  fastify.route({ method: 'GET', url: '/session/:sessionId/status', handler: getSessionStatusHandler });
 
   // Get QR code
-  fastify.get<{ Params: { sessionId: string } }>(
-    '/session/:sessionId/qr',
-    getQrCodeHandler
-  );
+  fastify.route({ method: 'GET', url: '/session/:sessionId/qr', handler: getQrCodeHandler });
 
   // Delete session
-  fastify.delete<{ Params: { sessionId: string } }>(
-    '/session/:sessionId',
-    deleteSessionHandler
-  );
+  fastify.route({ method: 'DELETE', url: '/session/:sessionId', handler: deleteSessionHandler });
 
-  // Send message (text and/or media)
-  fastify.route({
-    method: 'POST',
-    url: '/session/:sessionId/send',
-    handler: sendMessageHandler,
-  });
+  // Update webhook URL
+  fastify.route({ method: 'PUT', url: '/session/:sessionId/webhook', handler: updateWebhookHandler });
+
+  // ========================================
+  // MESSAGING
+  // ========================================
+
+  // Send message (text and/or media) to individual
+  fastify.route({ method: 'POST', url: '/session/:sessionId/send', handler: sendMessageHandler });
+
+  // Send message to group
+  fastify.route({ method: 'POST', url: '/session/:sessionId/send-group', handler: sendToGroupHandler });
+
+  // Broadcast to multiple recipients
+  fastify.route({ method: 'POST', url: '/session/:sessionId/broadcast', handler: broadcastHandler });
+
+  // ========================================
+  // GROUP MANAGEMENT
+  // ========================================
+
+  // List all groups
+  fastify.route({ method: 'GET', url: '/session/:sessionId/groups', handler: listGroupsHandler });
+
+  // Create new group
+  fastify.route({ method: 'POST', url: '/session/:sessionId/groups', handler: createGroupHandler });
+
+  // Get group info
+  fastify.route({ method: 'GET', url: '/session/:sessionId/groups/:groupId', handler: getGroupInfoHandler });
+
+  // Add participants to group
+  fastify.route({ method: 'POST', url: '/session/:sessionId/groups/:groupId/add', handler: addGroupParticipantsHandler });
+
+  // Remove participants from group
+  fastify.route({ method: 'POST', url: '/session/:sessionId/groups/:groupId/remove', handler: removeGroupParticipantsHandler });
+
+  // Leave group
+  fastify.route({ method: 'DELETE', url: '/session/:sessionId/groups/:groupId', handler: leaveGroupHandler });
 }
 
 export default sessionRoutes;
