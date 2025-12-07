@@ -9,8 +9,11 @@ import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
 import { env, validateEnv } from './config/env';
 import { initDatabase, closeDatabase } from './config/database';
+import { swaggerConfig, swaggerUiConfig } from './config/swagger';
 import { sessionRoutes } from './routes/sessionRoutes';
 import { userRoutes } from './routes/userRoutes';
 import { authRoutes } from './routes/authRoutes';
@@ -37,6 +40,10 @@ const app: FastifyInstance = Fastify({
  * Register plugins and routes
  */
 async function registerPlugins(): Promise<void> {
+  // Swagger documentation
+  await app.register(swagger, swaggerConfig);
+  await app.register(swaggerUi, swaggerUiConfig);
+
   // Rate limiting - anti-spam protection
   await app.register(rateLimit, {
     max: 100, // 100 requests per window
@@ -61,7 +68,23 @@ async function registerPlugins(): Promise<void> {
   });
 
   // Health check route (no auth required)
-  app.get('/health', async () => {
+  app.get('/health', {
+    schema: {
+      tags: ['Health'],
+      summary: 'Health check',
+      description: 'Returns server health status',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', example: 'ok' },
+            timestamp: { type: 'string', format: 'date-time' },
+            uptime: { type: 'number' },
+          },
+        },
+      },
+    },
+  }, async () => {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
@@ -70,7 +93,23 @@ async function registerPlugins(): Promise<void> {
   });
 
   // API info route
-  app.get('/', async () => {
+  app.get('/', {
+    schema: {
+      tags: ['Health'],
+      summary: 'API Info',
+      description: 'Returns API information and documentation link',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            version: { type: 'string' },
+            documentation: { type: 'string' },
+          },
+        },
+      },
+    },
+  }, async () => {
     return {
       name: 'WhatsApp API Gateway',
       version: '1.0.0',
