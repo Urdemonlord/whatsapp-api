@@ -28,7 +28,87 @@ interface SessionParams {
 
 interface SendMessageBody {
   to: string;
-  message: string;
+  message?: string;
+  media?: Array<{
+    type: 'image' | 'video' | 'document' | 'audio' | 'sticker';
+    data: string; // base64 or URL
+    caption?: string;
+    filename?: string;
+    mimetype?: string;
+  }>;
+}
+
+/**
+ * Helper: Prepare media buffer from URL, file path, or base64
+ */
+async function prepareMediaBuffer(mediaData: string): Promise<{ buffer: Buffer; mimetype?: string }> {
+  // HTTP/HTTPS URL
+  if (mediaData.startsWith('http://') || mediaData.startsWith('https://')) {
+    const response = await fetch(mediaData);
+    if (!response.ok) {
+      throw new Error('Failed to fetch media from URL');
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const contentType = response.headers.get('content-type');
+    return { buffer: Buffer.from(arrayBuffer), mimetype: contentType || undefined };
+  }
+  
+  // Local file path (file:// protocol or absolute path)
+  if (mediaData.startsWith('file://') || mediaData.match(/^[a-zA-Z]:[/\\]/) || mediaData.startsWith('/')) {
+    const { readFile } = await import('fs/promises');
+    const { fileURLToPath } = await import('url');
+    
+    let filePath = mediaData;
+    
+    // Convert file:// URL to path
+    if (mediaData.startsWith('file://')) {
+      filePath = fileURLToPath(mediaData);
+    }
+    
+    const buffer = await readFile(filePath);
+    
+    // Detect mimetype from extension
+    const ext = filePath.split('.').pop()?.toLowerCase();
+    const mimeMap: Record<string, string> = {
+      'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'gif': 'image/gif', 'webp': 'image/webp',
+      'mp4': 'video/mp4', '3gp': 'video/3gpp', 'mov': 'video/quicktime',
+      'pdf': 'application/pdf', 'doc': 'application/msword', 'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'xls': 'application/vnd.ms-excel', 'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'mp3': 'audio/mpeg', 'ogg': 'audio/ogg', 'wav': 'audio/wav',
+    };
+    
+    return { buffer, mimetype: ext ? mimeMap[ext] : undefined };
+  }
+  
+  // Assume base64
+  const base64Data = mediaData.includes(',') ? mediaData.split(',')[1] : mediaData;
+  return { buffer: Buffer.from(base64Data, 'base64') };
+}
+
+/**
+ * Helper: Build message content for media
+ */
+function buildMediaContent(
+  type: string,
+  buffer: Buffer,
+  mimetype?: string,
+  caption?: string,
+  filename?: string
+): Record<string, unknown> {
+  switch (type) {
+    case 'image':
+      return { image: buffer, caption, mimetype: mimetype || 'image/jpeg' };
+    case 'video':
+      return { video: buffer, caption, mimetype: mimetype || 'video/mp4' };
+    case 'document':
+      return { document: buffer, fileName: filename || 'document', caption, mimetype: mimetype || 'application/octet-stream' };
+    case 'audio':
+      return { audio: buffer, mimetype: mimetype || 'audio/mpeg', ptt: false };
+    case 'sticker':
+      return { sticker: buffer, mimetype: mimetype || 'image/webp' };
+    default:
+      throw new Error(`Invalid media type: ${type}`);
+  }
 }
 
 /**
@@ -131,7 +211,10 @@ export async function getSessionStatusHandler(
 
     reply.send({
       success: true,
-      data: status,
+      data: {
+        session_id: sessionId,
+        ...status,
+      },
     });
   } catch (error) {
     console.error('[Controller] Get status error:', error);
@@ -143,7 +226,7 @@ export async function getSessionStatusHandler(
 }
 
 /**
- * Get QR code for session
+ * Get QR code
  * GET /session/:sessionId/qr
  */
 export async function getQrCodeHandler(
@@ -168,18 +251,41 @@ export async function getQrCodeHandler(
     }
 
     const qr = qrCodes.get(sessionId);
+    const status = await getSessionStatus(sessionId);
+
+    if (status.status === 'connected') {
+      reply.send({
+        success: true,
+        data: {
+          session_id: sessionId,
+          status: 'connected',
+          qr: null,
+          message: 'Already connected',
+        },
+      });
+      return;
+    }
 
     if (!qr) {
-      reply.status(404).send({
-        success: false,
-        error: 'QR code not available. Session may already be connected.',
+      reply.send({
+        success: true,
+        data: {
+          session_id: sessionId,
+          status: status.status,
+          qr: null,
+          message: 'QR code not ready. Please wait...',
+        },
       });
       return;
     }
 
     reply.send({
       success: true,
-      data: { qr },
+      data: {
+        session_id: sessionId,
+        status: status.status,
+        qr: qr,
+      },
     });
   } catch (error) {
     console.error('[Controller] Get QR error:', error);
@@ -215,15 +321,7 @@ export async function deleteSessionHandler(
       return;
     }
 
-    const success = await deleteSession(sessionId);
-
-    if (!success) {
-      reply.status(500).send({
-        success: false,
-        error: 'Failed to delete session',
-      });
-      return;
-    }
+    await deleteSession(sessionId);
 
     reply.send({
       success: true,
@@ -275,8 +373,13 @@ export async function listSessionsHandler(
 }
 
 /**
- * Send a text message
+ * Send message with optional media
  * POST /session/:sessionId/send
+ * 
+ * Supports:
+ * - Text only: { to: "...", message: "Hello" }
+ * - Media only: { to: "...", media: [{ type: "image", data: "..." }] }
+ * - Text + Media: { to: "...", message: "Hello", media: [...] }
  */
 export async function sendMessageHandler(
   request: FastifyRequest<{ Params: SessionParams; Body: SendMessageBody }>,
@@ -284,14 +387,22 @@ export async function sendMessageHandler(
 ): Promise<void> {
   try {
     const { sessionId } = request.params;
-    const { to, message } = request.body;
+    const { to, message, media } = request.body;
     const user = request.user!;
 
-    // Validate input
-    if (!to || !message) {
+    // Validate input - need at least message or media
+    if (!to) {
       reply.status(400).send({
         success: false,
-        error: 'Missing "to" or "message" in request body',
+        error: 'Missing "to" in request body',
+      });
+      return;
+    }
+
+    if (!message && (!media || media.length === 0)) {
+      reply.status(400).send({
+        success: false,
+        error: 'Must provide either "message" or "media" array',
       });
       return;
     }
@@ -320,17 +431,39 @@ export async function sendMessageHandler(
       return;
     }
 
-    // Format phone number (add @s.whatsapp.net suffix)
+    // Format phone number
     const jid = to.includes('@') ? to : `${to.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
 
-    // Send message
-    const result = await socket.sendMessage(jid, { text: message });
+    const results: Array<{ type: string; messageId?: string }> = [];
+
+    // Send text message if provided
+    if (message) {
+      const textResult = await socket.sendMessage(jid, { text: message });
+      results.push({ type: 'text', messageId: textResult?.key?.id ?? undefined });
+    }
+
+    // Send media if provided
+    if (media && media.length > 0) {
+      for (const item of media) {
+        const { buffer, mimetype: detectedMimetype } = await prepareMediaBuffer(item.data);
+        const content = buildMediaContent(
+          item.type,
+          buffer,
+          item.mimetype || detectedMimetype,
+          item.caption,
+          item.filename
+        );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mediaResult = await socket.sendMessage(jid, content as any);
+        results.push({ type: item.type, messageId: mediaResult?.key?.id ?? undefined });
+      }
+    }
 
     reply.send({
       success: true,
       data: {
-        messageId: result?.key?.id,
         to: jid,
+        sent: results,
       },
     });
   } catch (error) {

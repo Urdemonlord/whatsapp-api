@@ -49,11 +49,12 @@ export async function sessionRoutes(
     deleteSessionHandler
   );
 
-  // Send message
-  fastify.post<{ Params: { sessionId: string }; Body: { to: string; message: string } }>(
-    '/session/:sessionId/send',
-    sendMessageHandler
-  );
+  // Send message (text and/or media)
+  fastify.route({
+    method: 'POST',
+    url: '/session/:sessionId/send',
+    handler: sendMessageHandler,
+  });
 }
 
 export default sessionRoutes;
