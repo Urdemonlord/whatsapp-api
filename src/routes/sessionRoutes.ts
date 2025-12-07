@@ -25,6 +25,13 @@ import {
   leaveGroupHandler,
   updateWebhookHandler,
 } from '../controllers/groupController';
+import {
+  createScheduledHandler,
+  listScheduledHandler,
+  getScheduledHandler,
+  cancelScheduledHandler,
+  historyScheduledHandler,
+} from '../controllers/scheduleController';
 
 /**
  * Register session routes
@@ -70,6 +77,25 @@ export async function sessionRoutes(
 
   // Broadcast to multiple recipients
   fastify.route({ method: 'POST', url: '/session/:sessionId/broadcast', handler: broadcastHandler });
+
+  // ========================================
+  // SCHEDULED MESSAGES
+  // ========================================
+
+  // Create scheduled message
+  fastify.route({ method: 'POST', url: '/session/:sessionId/schedule', handler: createScheduledHandler });
+
+  // List pending scheduled messages
+  fastify.route({ method: 'GET', url: '/session/:sessionId/schedule', handler: listScheduledHandler });
+
+  // Get scheduled message history
+  fastify.route({ method: 'GET', url: '/session/:sessionId/schedule/history', handler: historyScheduledHandler });
+
+  // Get specific scheduled message
+  fastify.route({ method: 'GET', url: '/session/:sessionId/schedule/:messageId', handler: getScheduledHandler });
+
+  // Cancel scheduled message
+  fastify.route({ method: 'DELETE', url: '/session/:sessionId/schedule/:messageId', handler: cancelScheduledHandler });
 
   // ========================================
   // GROUP MANAGEMENT

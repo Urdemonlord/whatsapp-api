@@ -8,12 +8,14 @@ import 'reflect-metadata';
 import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import { env, validateEnv } from './config/env';
 import { initDatabase, closeDatabase } from './config/database';
 import { sessionRoutes } from './routes/sessionRoutes';
 import { userRoutes } from './routes/userRoutes';
 import { authRoutes } from './routes/authRoutes';
 import { restoreAllSessions, closeAllSessions } from './services/whatsappService';
+import { startScheduler, stopScheduler } from './services/schedulerService';
 import { User } from './models/User';
 
 // Create Fastify instance
@@ -35,6 +37,17 @@ const app: FastifyInstance = Fastify({
  * Register plugins and routes
  */
 async function registerPlugins(): Promise<void> {
+  // Rate limiting - anti-spam protection
+  await app.register(rateLimit, {
+    max: 100, // 100 requests per window
+    timeWindow: '1 minute',
+    errorResponseBuilder: () => ({
+      success: false,
+      error: 'Too many requests. Please slow down.',
+      code: 'RATE_LIMIT_EXCEEDED',
+    }),
+  });
+
   // CORS
   await app.register(cors, {
     origin: true,
@@ -125,6 +138,9 @@ async function start(): Promise<void> {
     // Restore existing sessions
     await restoreAllSessions();
 
+    // Start scheduled message processor
+    startScheduler();
+
     // Start server
     const address = await app.listen({
       port: env.port,
@@ -135,6 +151,8 @@ async function start(): Promise<void> {
     console.log('🚀 WhatsApp API Gateway is running!');
     console.log(`📍 Server: ${address}`);
     console.log(`🔧 Environment: ${env.nodeEnv}`);
+    console.log(`⏰ Scheduler: Active (checking every minute)`);
+    console.log(`🛡️  Rate Limit: 100 requests/minute`);
     console.log('');
     console.log('API Endpoints:');
     console.log('');
@@ -145,6 +163,8 @@ async function start(): Promise<void> {
     console.log(`  GET    ${address}/api/session/:id/qr`);
     console.log(`  DELETE ${address}/api/session/:id`);
     console.log(`  POST   ${address}/api/session/:id/send`);
+    console.log(`  POST   ${address}/api/session/:id/broadcast`);
+    console.log(`  POST   ${address}/api/session/:id/schedule`);
     console.log('');
     console.log('User:');
     console.log(`  GET    ${address}/api/users/me`);
@@ -168,6 +188,9 @@ async function shutdown(): Promise<void> {
   console.log('\n🛑 Shutting down gracefully...');
 
   try {
+    // Stop scheduler
+    stopScheduler();
+
     // Close all WhatsApp sessions
     await closeAllSessions();
 
