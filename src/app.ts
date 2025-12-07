@@ -11,6 +11,8 @@ import helmet from '@fastify/helmet';
 import { env, validateEnv } from './config/env';
 import { initDatabase, closeDatabase } from './config/database';
 import { sessionRoutes } from './routes/sessionRoutes';
+import { userRoutes } from './routes/userRoutes';
+import { authRoutes } from './routes/authRoutes';
 import { restoreAllSessions, closeAllSessions } from './services/whatsappService';
 import { User } from './models/User';
 
@@ -65,6 +67,12 @@ async function registerPlugins(): Promise<void> {
 
   // Register session routes under /api prefix
   await app.register(sessionRoutes, { prefix: '/api' });
+
+  // Register user routes under /api prefix
+  await app.register(userRoutes, { prefix: '/api' });
+
+  // Register auth routes under /api prefix (PUBLIC - no auth required)
+  await app.register(authRoutes, { prefix: '/api' });
 }
 
 /**
@@ -78,6 +86,7 @@ async function seedDatabase(): Promise<void> {
       const adminUser = await User.create({
         username: 'admin',
         password: 'admin123', // Will be hashed by model hook
+        role: 'admin', // Set as admin
       });
 
       console.log('='.repeat(60));
@@ -85,6 +94,7 @@ async function seedDatabase(): Promise<void> {
       console.log('='.repeat(60));
       console.log(`Username: admin`);
       console.log(`Password: admin123`);
+      console.log(`Role:     admin`);
       console.log(`API Key:  ${adminUser.api_key}`);
       console.log('='.repeat(60));
       console.log('⚠️  Please change the password after first login!');
@@ -127,12 +137,23 @@ async function start(): Promise<void> {
     console.log(`🔧 Environment: ${env.nodeEnv}`);
     console.log('');
     console.log('API Endpoints:');
+    console.log('');
+    console.log('Session:');
     console.log(`  POST   ${address}/api/session/create`);
     console.log(`  GET    ${address}/api/sessions`);
     console.log(`  GET    ${address}/api/session/:id/status`);
     console.log(`  GET    ${address}/api/session/:id/qr`);
     console.log(`  DELETE ${address}/api/session/:id`);
     console.log(`  POST   ${address}/api/session/:id/send`);
+    console.log('');
+    console.log('User:');
+    console.log(`  GET    ${address}/api/users/me`);
+    console.log(`  POST   ${address}/api/users`);
+    console.log(`  GET    ${address}/api/users`);
+    console.log(`  GET    ${address}/api/users/:id`);
+    console.log(`  PUT    ${address}/api/users/:id`);
+    console.log(`  DELETE ${address}/api/users/:id`);
+    console.log(`  POST   ${address}/api/users/:id/regenerate-key`);
     console.log('');
   } catch (error) {
     console.error('Failed to start server:', error);
