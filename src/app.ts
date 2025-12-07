@@ -10,10 +10,10 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
-import swaggerUi from '@fastify/swagger-ui';
+import apiReference from '@scalar/fastify-api-reference';
 import { env, validateEnv } from './config/env';
 import { initDatabase, closeDatabase } from './config/database';
-import { swaggerConfig, swaggerUiConfig } from './config/swagger';
+import { swaggerConfig } from './config/swagger';
 import { sessionRoutes } from './routes/sessionRoutes';
 import { userRoutes } from './routes/userRoutes';
 import { authRoutes } from './routes/authRoutes';
@@ -34,15 +34,34 @@ const app: FastifyInstance = Fastify({
         }
       : undefined,
   },
+  ajv: {
+    customOptions: {
+      removeAdditional: true,
+      coerceTypes: true,
+      useDefaults: true,
+      keywords: ['example'],
+    },
+  },
 });
 
 /**
  * Register plugins and routes
  */
 async function registerPlugins(): Promise<void> {
-  // Swagger documentation
+  // Swagger documentation (OpenAPI 3.0 generator)
   await app.register(swagger, swaggerConfig);
-  await app.register(swaggerUi, swaggerUiConfig);
+
+  // Scalar API Reference (Better UI + Code Snippets)
+  await app.register(apiReference, {
+    routePrefix: '/docs',
+    configuration: {
+      title: 'VenusConnect API Documentation',
+      theme: 'purple',
+      spec: {
+        content: () => app.swagger(),
+      },
+    },
+  });
 
   // Rate limiting - anti-spam protection
   await app.register(rateLimit, {
@@ -70,19 +89,7 @@ async function registerPlugins(): Promise<void> {
   // Health check route (no auth required)
   app.get('/health', {
     schema: {
-      tags: ['Health'],
-      summary: 'Health check',
-      description: 'Returns server health status',
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            status: { type: 'string', example: 'ok' },
-            timestamp: { type: 'string', format: 'date-time' },
-            uptime: { type: 'number' },
-          },
-        },
-      },
+      hide: true,
     },
   }, async () => {
     return {
@@ -95,9 +102,10 @@ async function registerPlugins(): Promise<void> {
   // API info route
   app.get('/', {
     schema: {
+      hide: true,
       tags: ['Health'],
       summary: 'API Info',
-      description: 'Returns API information and documentation link',
+      description: 'Returns API information and documentation links',
       response: {
         200: {
           type: 'object',
@@ -105,16 +113,39 @@ async function registerPlugins(): Promise<void> {
             name: { type: 'string' },
             version: { type: 'string' },
             documentation: { type: 'string' },
+            openapi: { type: 'string' },
           },
         },
       },
     },
   }, async () => {
     return {
-      name: 'WhatsApp API Gateway',
+      name: 'VenusConnect - WhatsApp API Gateway',
       version: '1.0.0',
       documentation: '/docs',
+      openapi: '/openapi.json',
     };
+  });
+
+  // Serve OpenAPI 3.0 specification
+  app.get('/openapi.json', {
+    schema: {
+      tags: ['Health'],
+      summary: 'OpenAPI 3.0 Specification',
+      description: 'Returns the complete OpenAPI 3.0.3 specification in JSON format',
+      hide: true,
+    },
+  }, async (_, reply) => {
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const specPath = path.join(__dirname, '..', 'docs', 'openapi.json');
+      const spec = await fs.readFile(specPath, 'utf-8');
+      reply.header('Content-Type', 'application/json');
+      return spec;
+    } catch {
+      return { error: 'OpenAPI specification not found' };
+    }
   });
 
   // Register session routes under /api prefix

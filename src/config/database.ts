@@ -56,7 +56,8 @@ export async function initDatabase(): Promise<void> {
     // Sync all models (create tables if not exist)
     // In production, use migrations instead
     if (env.isDev) {
-      await sequelize.sync({ alter: true });
+      // Disabled alter to prevent ER_TOO_MANY_KEYS loop
+      await sequelize.sync({ alter: false });
       console.log('✅ Database models synchronized.');
     } else {
       await sequelize.sync();

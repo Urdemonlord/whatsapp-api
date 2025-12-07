@@ -1,0 +1,1221 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "VenusConnect - WhatsApp API Gateway",
+    "description": "REST API untuk mengirim dan menerima pesan WhatsApp menggunakan Baileys library.\n\n## Authentication\n\nSemua endpoint (kecuali `/health` dan `/api/auth/*`) memerlukan API key di header:\n\n```\nx-api-key: your-api-key-here\n```\n\n## Rate Limiting\n\n- **100 requests/minute** per IP\n- Jika limit terlampaui, response akan error 429\n\n## Media Support\n\nMedia dapat dikirim dalam 3 format:\n- **URL**: `https://example.com/image.jpg`\n- **Local Path**: `/path/to/file.pdf`\n- **Base64**: `data:image/jpeg;base64,/9j/4AAQ...`\n\n## Webhook Events\n\nJika webhook URL dikonfigurasi, events berikut akan dikirim:\n- `message.received` - Pesan masuk\n- `message.status` - Status pesan (sent/delivered/read)\n- `presence.update` - Online/offline/typing",
+    "version": "1.0.0",
+    "contact": {
+      "name": "VenusConnect Support",
+      "email": "support@venusconnect.io",
+      "url": "https://venusconnect.io"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Development Server"
+    },
+    {
+      "url": "https://api.venusconnect.io",
+      "description": "Production Server"
+    }
+  ],
+  "tags": [
+    { "name": "Health", "description": "Health check endpoints" },
+    { "name": "Auth", "description": "Public authentication (no API key required)" },
+    { "name": "Session", "description": "WhatsApp session management" },
+    { "name": "Messaging", "description": "Send messages (text, media, group, broadcast)" },
+    { "name": "Scheduled", "description": "Scheduled message management" },
+    { "name": "Groups", "description": "WhatsApp group management" },
+    { "name": "Users", "description": "User management (admin only)" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "description": "Check if API is running",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "API is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "timestamp": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register new user",
+        "description": "Create a new user account (public endpoint)",
+        "operationId": "register",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "User login",
+        "description": "Authenticate and get API key",
+        "operationId": "login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session": {
+      "get": {
+        "tags": ["Session"],
+        "summary": "List all sessions",
+        "description": "Get all WhatsApp sessions for current user",
+        "operationId": "listSessions",
+        "security": [{ "ApiKeyAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Sessions list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Session" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Session"],
+        "summary": "Create new session",
+        "description": "Create a new WhatsApp session and get QR code",
+        "operationId": "createSession",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/SessionStatus" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionId}": {
+      "get": {
+        "tags": ["Session"],
+        "summary": "Get session status",
+        "operationId": "getSessionStatus",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/SessionStatus" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Session"],
+        "summary": "Delete session",
+        "description": "Logout and delete WhatsApp session",
+        "operationId": "deleteSession",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session deleted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionId}/qr": {
+      "get": {
+        "tags": ["Session"],
+        "summary": "Get QR code",
+        "description": "Get QR code for session authentication",
+        "operationId": "getQRCode",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "QR code data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "qr": { "type": "string", "description": "Base64 QR code image" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionId}/send": {
+      "post": {
+        "tags": ["Messaging"],
+        "summary": "Send message",
+        "description": "Send text and/or media to individual contact",
+        "operationId": "sendMessage",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SendMessageRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Message sent",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessageResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionId}/send-group": {
+      "post": {
+        "tags": ["Messaging"],
+        "summary": "Send to group",
+        "description": "Send message to WhatsApp group",
+        "operationId": "sendGroupMessage",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SendGroupMessageRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Message sent to group",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessageResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionId}/broadcast": {
+      "post": {
+        "tags": ["Messaging"],
+        "summary": "Broadcast message",
+        "description": "Send message to multiple recipients with configurable delay",
+        "operationId": "broadcastMessage",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BroadcastRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Broadcast completed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BroadcastResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionId}/webhook": {
+      "put": {
+        "tags": ["Session"],
+        "summary": "Update webhook URL",
+        "description": "Set or update the webhook URL for session events",
+        "operationId": "updateWebhook",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "webhook_url": { "type": "string", "format": "uri", "nullable": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionId}/schedule": {
+      "get": {
+        "tags": ["Scheduled"],
+        "summary": "List scheduled messages",
+        "description": "Get all pending scheduled messages",
+        "operationId": "listScheduledMessages",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scheduled messages list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/ScheduledMessage" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Scheduled"],
+        "summary": "Create scheduled message",
+        "description": "Schedule a message to be sent at specific time",
+        "operationId": "createScheduledMessage",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateScheduledRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Scheduled message created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/ScheduledMessage" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionId}/schedule/history": {
+      "get": {
+        "tags": ["Scheduled"],
+        "summary": "Get message history",
+        "description": "Get sent, failed, and cancelled scheduled messages",
+        "operationId": "getScheduledHistory",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/ScheduledMessage" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionId}/schedule/{messageId}": {
+      "get": {
+        "tags": ["Scheduled"],
+        "summary": "Get scheduled message",
+        "operationId": "getScheduledMessage",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" },
+          { "$ref": "#/components/parameters/MessageId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scheduled message details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/ScheduledMessage" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Scheduled"],
+        "summary": "Cancel scheduled message",
+        "operationId": "cancelScheduledMessage",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" },
+          { "$ref": "#/components/parameters/MessageId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message cancelled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionId}/groups": {
+      "get": {
+        "tags": ["Groups"],
+        "summary": "List groups",
+        "description": "Get all groups the session is participating in",
+        "operationId": "listGroups",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Groups list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Group" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Groups"],
+        "summary": "Create group",
+        "description": "Create a new WhatsApp group",
+        "operationId": "createGroup",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateGroupRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Group created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/Group" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionId}/groups/{groupId}": {
+      "get": {
+        "tags": ["Groups"],
+        "summary": "Get group info",
+        "description": "Get group metadata and participants",
+        "operationId": "getGroupInfo",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" },
+          { "$ref": "#/components/parameters/GroupId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Group info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/GroupInfo" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Groups"],
+        "summary": "Leave group",
+        "operationId": "leaveGroup",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" },
+          { "$ref": "#/components/parameters/GroupId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Left group",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionId}/groups/{groupId}/participants/add": {
+      "post": {
+        "tags": ["Groups"],
+        "summary": "Add participants",
+        "description": "Add members to group",
+        "operationId": "addParticipants",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" },
+          { "$ref": "#/components/parameters/GroupId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ParticipantsRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Participants added",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/{sessionId}/groups/{groupId}/participants/remove": {
+      "post": {
+        "tags": ["Groups"],
+        "summary": "Remove participants",
+        "description": "Remove members from group",
+        "operationId": "removeParticipants",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" },
+          { "$ref": "#/components/parameters/GroupId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ParticipantsRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Participants removed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get current user",
+        "description": "Get authenticated user profile",
+        "operationId": "getCurrentUser",
+        "security": [{ "ApiKeyAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "List users (admin)",
+        "operationId": "listUsers",
+        "security": [{ "ApiKeyAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Users list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/User" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Users"],
+        "summary": "Create user (admin)",
+        "operationId": "createUser",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateUserRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{userId}": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get user (admin)",
+        "operationId": "getUser",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/UserId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "User details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Users"],
+        "summary": "Update user (admin)",
+        "operationId": "updateUser",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/UserId" }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateUserRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Users"],
+        "summary": "Delete user (admin)",
+        "operationId": "deleteUser",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/UserId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "User deleted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{userId}/regenerate-key": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Regenerate API key (admin)",
+        "operationId": "regenerateApiKey",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/UserId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "New API key generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "api_key": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "API key for authentication"
+      }
+    },
+    "parameters": {
+      "SessionId": {
+        "name": "sessionId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" },
+        "description": "WhatsApp session ID"
+      },
+      "MessageId": {
+        "name": "messageId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" },
+        "description": "Scheduled message ID"
+      },
+      "GroupId": {
+        "name": "groupId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" },
+        "description": "WhatsApp group JID"
+      },
+      "UserId": {
+        "name": "userId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" },
+        "description": "User ID"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "error": { "type": "string" }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "message": { "type": "string" }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+          "username": { "type": "string", "minLength": 3, "example": "johndoe" },
+          "email": { "type": "string", "format": "email", "example": "john@example.com" },
+          "password": { "type": "string", "minLength": 6, "example": "secret123" }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+          "username": { "type": "string" },
+          "password": { "type": "string" }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "username": { "type": "string" },
+              "role": { "type": "string", "enum": ["admin", "user"] },
+              "api_key": { "type": "string" }
+            }
+          }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "status": { "type": "string", "enum": ["connecting", "connected", "disconnected"] },
+          "phone_number": { "type": "string" },
+          "name": { "type": "string" },
+          "connected": { "type": "boolean" },
+          "hasQr": { "type": "boolean" }
+        }
+      },
+      "SessionStatus": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "status": { "type": "string" },
+          "connected": { "type": "boolean" },
+          "qr": { "type": "string", "nullable": true, "description": "Base64 QR code" },
+          "message": { "type": "string" }
+        }
+      },
+      "CreateSessionRequest": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "Custom session ID (optional)" },
+          "webhook_url": { "type": "string", "format": "uri", "description": "Webhook URL for events" }
+        }
+      },
+      "SendMessageRequest": {
+        "type": "object",
+        "required": ["to"],
+        "properties": {
+          "to": { "type": "string", "description": "Phone number (e.g., 6281234567890)", "example": "6281234567890" },
+          "message": { "type": "string", "description": "Text message" },
+          "media": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/MediaItem" }
+          }
+        }
+      },
+      "SendGroupMessageRequest": {
+        "type": "object",
+        "required": ["groupId"],
+        "properties": {
+          "groupId": { "type": "string", "description": "Group JID (e.g., 120363xxx@g.us)" },
+          "message": { "type": "string" },
+          "media": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/MediaItem" }
+          }
+        }
+      },
+      "BroadcastRequest": {
+        "type": "object",
+        "required": ["recipients"],
+        "properties": {
+          "recipients": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Array of phone numbers"
+          },
+          "message": { "type": "string" },
+          "media": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/MediaItem" }
+          },
+          "delay": { "type": "integer", "default": 1000, "description": "Delay in ms between messages" }
+        }
+      },
+      "BroadcastResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer" },
+              "sent": { "type": "integer" },
+              "failed": { "type": "integer" },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "to": { "type": "string" },
+                    "success": { "type": "boolean" },
+                    "messageId": { "type": "string" },
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "MediaItem": {
+        "type": "object",
+        "required": ["type", "data"],
+        "properties": {
+          "type": { "type": "string", "enum": ["image", "video", "document", "audio", "sticker"] },
+          "data": { "type": "string", "description": "URL, local path, or base64" },
+          "caption": { "type": "string" },
+          "filename": { "type": "string" },
+          "mimetype": { "type": "string" }
+        }
+      },
+      "MessageResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "messageId": { "type": "string" }
+            }
+          }
+        }
+      },
+      "ScheduledMessage": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "session_id": { "type": "string" },
+          "recipient": { "type": "string" },
+          "recipient_type": { "type": "string", "enum": ["individual", "group"] },
+          "message": { "type": "string" },
+          "media": { "type": "object" },
+          "scheduled_at": { "type": "string", "format": "date-time" },
+          "status": { "type": "string", "enum": ["pending", "processing", "sent", "failed", "cancelled"] },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateScheduledRequest": {
+        "type": "object",
+        "required": ["recipient", "scheduled_at"],
+        "properties": {
+          "recipient": { "type": "string", "description": "Phone number or group JID" },
+          "recipient_type": { "type": "string", "enum": ["individual", "group"], "default": "individual" },
+          "message": { "type": "string" },
+          "media": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/MediaItem" }
+          },
+          "scheduled_at": { "type": "string", "format": "date-time", "description": "ISO 8601 date-time" }
+        }
+      },
+      "Group": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Group JID" },
+          "name": { "type": "string" },
+          "owner": { "type": "string" },
+          "participantsCount": { "type": "integer" },
+          "desc": { "type": "string", "nullable": true }
+        }
+      },
+      "GroupInfo": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "owner": { "type": "string" },
+          "desc": { "type": "string" },
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "isAdmin": { "type": "boolean" },
+                "isSuperAdmin": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      },
+      "CreateGroupRequest": {
+        "type": "object",
+        "required": ["name", "participants"],
+        "properties": {
+          "name": { "type": "string" },
+          "participants": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Array of phone numbers to add"
+          }
+        }
+      },
+      "ParticipantsRequest": {
+        "type": "object",
+        "required": ["participants"],
+        "properties": {
+          "participants": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "username": { "type": "string" },
+          "email": { "type": "string" },
+          "role": { "type": "string", "enum": ["admin", "user"] },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateUserRequest": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+          "username": { "type": "string" },
+          "email": { "type": "string" },
+          "password": { "type": "string" },
+          "role": { "type": "string", "enum": ["admin", "user"], "default": "user" }
+        }
+      },
+      "UpdateUserRequest": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string" },
+          "password": { "type": "string" },
+          "role": { "type": "string", "enum": ["admin", "user"] }
+        }
+      }
+    }
+  }
+}

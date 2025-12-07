@@ -31,9 +31,9 @@ export const AuthSchemas = {
       type: 'object' as const,
       required: ['username', 'password'],
       properties: {
-        username: { type: 'string' as const, minLength: 3 },
-        email: { type: 'string' as const, format: 'email' },
-        password: { type: 'string' as const, minLength: 6 },
+        username: { type: 'string' as const, minLength: 3, example: 'new_user' },
+        email: { type: 'string' as const, format: 'email', example: 'user@example.com' },
+        password: { type: 'string' as const, minLength: 6, example: 'password123' },
       },
     },
     response: {
@@ -62,8 +62,8 @@ export const AuthSchemas = {
       type: 'object' as const,
       required: ['username', 'password'],
       properties: {
-        username: { type: 'string' as const },
-        password: { type: 'string' as const },
+        username: { type: 'string' as const, example: 'admin_user' },
+        password: { type: 'string' as const, example: 'securePassword123' },
       },
     },
     response: {
@@ -93,12 +93,12 @@ export const SessionSchemas = {
     tags: ['Session'],
     summary: 'Create WhatsApp session',
     description: 'Create a new WhatsApp session and get QR code',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
     body: {
       type: 'object' as const,
       properties: {
         session_id: { type: 'string' as const, description: 'Optional custom session ID' },
-        webhook_url: { type: 'string' as const, format: 'uri', description: 'Webhook URL for events' },
+        webhook_url: { type: 'string' as const, description: 'Webhook URL for events', nullable: true, example: 'https://webhook.site/...' },
       },
     },
     response: {
@@ -124,7 +124,7 @@ export const SessionSchemas = {
     tags: ['Session'],
     summary: 'List sessions',
     description: 'Get all sessions for current user',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
     response: {
       200: {
         type: 'object' as const,
@@ -151,7 +151,7 @@ export const SessionSchemas = {
   status: {
     tags: ['Session'],
     summary: 'Get session status',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
     params: {
       type: 'object' as const,
       properties: {
@@ -163,7 +163,7 @@ export const SessionSchemas = {
     tags: ['Session'],
     summary: 'Get QR code',
     description: 'Get QR code for session authentication',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
     params: {
       type: 'object' as const,
       properties: {
@@ -175,11 +175,24 @@ export const SessionSchemas = {
     tags: ['Session'],
     summary: 'Delete session',
     description: 'Logout and delete WhatsApp session',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
     params: {
       type: 'object' as const,
       properties: {
         sessionId: { type: 'string' as const },
+      },
+    },
+  },
+  updateWebhook: {
+    tags: ['Session'],
+    summary: 'Update webhook URL',
+    description: 'Set or update the webhook URL for session events',
+    security: [{ ApiKeyAuth: [] }],
+    body: {
+      type: 'object' as const,
+      required: ['webhook_url'],
+      properties: {
+        webhook_url: { type: 'string' as const, format: 'uri', nullable: true },
       },
     },
   },
@@ -191,7 +204,7 @@ export const MessagingSchemas = {
     tags: ['Messaging'],
     summary: 'Send message',
     description: 'Send text and/or media to individual contact',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
     params: {
       type: 'object' as const,
       properties: {
@@ -225,7 +238,7 @@ export const MessagingSchemas = {
     tags: ['Messaging'],
     summary: 'Send to group',
     description: 'Send message to WhatsApp group',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
     body: {
       type: 'object' as const,
       required: ['groupId'],
@@ -240,7 +253,7 @@ export const MessagingSchemas = {
     tags: ['Messaging'],
     summary: 'Broadcast message',
     description: 'Send message to multiple recipients with delay',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
     body: {
       type: 'object' as const,
       required: ['recipients'],
@@ -264,7 +277,7 @@ export const ScheduledSchemas = {
     tags: ['Scheduled'],
     summary: 'Create scheduled message',
     description: 'Schedule a message to be sent at specific time',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
     body: {
       type: 'object' as const,
       required: ['recipient', 'scheduled_at'],
@@ -280,23 +293,23 @@ export const ScheduledSchemas = {
   list: {
     tags: ['Scheduled'],
     summary: 'List pending scheduled messages',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
   history: {
     tags: ['Scheduled'],
     summary: 'Get scheduled message history',
     description: 'Get sent/failed/cancelled messages',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
   get: {
     tags: ['Scheduled'],
     summary: 'Get scheduled message by ID',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
   cancel: {
     tags: ['Scheduled'],
     summary: 'Cancel scheduled message',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
 };
 
@@ -306,13 +319,13 @@ export const GroupSchemas = {
     tags: ['Groups'],
     summary: 'List all groups',
     description: 'Get all groups the session is participating in',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
   create: {
     tags: ['Groups'],
     summary: 'Create group',
     description: 'Create a new WhatsApp group',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
     body: {
       type: 'object' as const,
       required: ['name', 'participants'],
@@ -330,13 +343,13 @@ export const GroupSchemas = {
     tags: ['Groups'],
     summary: 'Get group info',
     description: 'Get group metadata and participants',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
   addParticipants: {
     tags: ['Groups'],
     summary: 'Add participants',
     description: 'Add members to group',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
     body: {
       type: 'object' as const,
       required: ['participants'],
@@ -349,7 +362,7 @@ export const GroupSchemas = {
     tags: ['Groups'],
     summary: 'Remove participants',
     description: 'Remove members from group',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
     body: {
       type: 'object' as const,
       required: ['participants'],
@@ -361,57 +374,64 @@ export const GroupSchemas = {
   leave: {
     tags: ['Groups'],
     summary: 'Leave group',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
 };
 
 // User schemas
 export const UserSchemas = {
   me: {
+    hide: true,
     tags: ['Users'],
     summary: 'Get current user',
     description: 'Get authenticated user profile',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
   list: {
+    hide: true,
     tags: ['Users'],
     summary: 'List all users (admin)',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
   create: {
+    hide: true,
     tags: ['Users'],
     summary: 'Create user (admin)',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
     body: {
       type: 'object' as const,
       required: ['username', 'password'],
       properties: {
-        username: { type: 'string' as const },
-        email: { type: 'string' as const },
-        password: { type: 'string' as const },
-        role: { type: 'string' as const, enum: ['admin', 'user'] },
+        username: { type: 'string' as const, example: 'admin_user' },
+        email: { type: 'string' as const, example: 'admin@example.com' },
+        password: { type: 'string' as const, example: 'adminPass123' },
+        role: { type: 'string' as const, enum: ['admin', 'user'], example: 'user' },
       },
     },
   },
   get: {
+    hide: true,
     tags: ['Users'],
     summary: 'Get user by ID (admin)',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
   update: {
+    hide: true,
     tags: ['Users'],
     summary: 'Update user (admin)',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
   delete: {
+    hide: true,
     tags: ['Users'],
     summary: 'Delete user (admin)',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
   regenerateKey: {
+    hide: true,
     tags: ['Users'],
     summary: 'Regenerate API key (admin)',
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
 };
 

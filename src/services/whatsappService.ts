@@ -100,7 +100,8 @@ export function getSession(sessionId: string): WASocket | undefined {
  */
 export async function createSession(
   sessionId: string,
-  userId: string
+  userId: string,
+  webhookUrl?: string
 ): Promise<{
   success: boolean;
   qr?: string;
@@ -129,14 +130,25 @@ export async function createSession(
     }
 
     // Create or update session in database
-    const [session] = await Session.findOrCreate({
+    const [session, created] = await Session.findOrCreate({
       where: { session_id: sessionId },
       defaults: {
         session_id: sessionId,
         user_id: userId,
         status: SessionStatus.CONNECTING,
+        webhook_url: webhookUrl,
       },
     });
+
+    // If session existed but we are restarting it, update webhook if provided
+    if (!created && webhookUrl) {
+      session.webhook_url = webhookUrl;
+      await session.save();
+    } else if (!created) {
+       // Ensure status is connecting
+       session.status = SessionStatus.CONNECTING;
+       await session.save();
+    }
 
     // Initialize auth state from database
     const { state, saveCreds, deleteSession } = await useSequelizeAuthState(sessionId);

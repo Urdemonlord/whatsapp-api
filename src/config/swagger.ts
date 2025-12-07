@@ -1,90 +1,81 @@
 /**
- * OpenAPI Schema Definitions
- * 
- * Contains all schema definitions and OpenAPI configuration for Swagger
+ * OpenAPI 3.0 Configuration
  */
+import { SwaggerOptions } from '@fastify/swagger';
 
-import { FastifySwaggerUiOptions } from '@fastify/swagger-ui';
-
-// Swagger UI configuration
-export const swaggerUiConfig: FastifySwaggerUiOptions = {
-  routePrefix: '/docs',
-  uiConfig: {
-    docExpansion: 'list' as const,
-    deepLinking: true,
-    persistAuthorization: true,
-    displayRequestDuration: true,
-  },
-  staticCSP: true,
-};
-
-// OpenAPI configuration
-export const swaggerConfig = {
+// OpenAPI 3.0 configuration for Fastify Swagger
+export const swaggerConfig: SwaggerOptions = {
   openapi: {
+    openapi: '3.0.3',
     info: {
-      title: 'WhatsApp API Gateway',
-      description: `
-# WhatsApp Multi-Device API Gateway
+      title: 'VenusConnect - WhatsApp API Gateway',
+      description: `# WhatsApp Multi-Device API Gateway
 
-REST API untuk mengirim dan menerima pesan WhatsApp menggunakan Baileys library.
+REST API untuk mengirim dan menerima pesan WhatsApp.
 
-## Authentication
-
-Semua endpoint (kecuali /health dan /api/auth/*) memerlukan API key di header:
-
+## 🔐 Authentication
 \`\`\`
 x-api-key: your-api-key-here
 \`\`\`
 
-## Rate Limiting
+## ⏱️ Rate Limiting
 
 - **100 requests/minute** per IP
 - Jika limit terlampaui, response akan error 429
 
-## Media Support
+## 📎 Media Support
 
 Media dapat dikirim dalam 3 format:
 - **URL**: \`https://example.com/image.jpg\`
-- **Local Path**: \`C:/Users/path/to/file.pdf\`
+- **Local Path**: \`/path/to/file.pdf\`
 - **Base64**: \`data:image/jpeg;base64,/9j/4AAQ...\`
 
-## Webhook Events
+## 🔔 Webhook Events
 
 Jika webhook URL dikonfigurasi, events berikut akan dikirim:
 - \`message.received\` - Pesan masuk
 - \`message.status\` - Status pesan (sent/delivered/read)
 - \`presence.update\` - Online/offline/typing
-      `,
+
+`,
       version: '1.0.0',
       contact: {
-        name: 'API Support',
-        email: 'support@example.com',
+        name: 'VenusConnect Support',
+        email: 'contact@venusverse.dev',
+        url: 'https://whatsapp.venusverse.me',
       },
+      license: {
+        name: 'MIT',
+        url: 'https://opensource.org/licenses/MIT',
+      },
+    },
+    externalDocs: {
+      url: 'https://whatsapp.venusverse.me/docs',
+      description: 'Full Documentation',
     },
     servers: [
       { url: 'http://localhost:3000', description: 'Development' },
+      { url: 'https://whatsapp.venusverse.me', description: 'Production' },
     ],
     tags: [
-      { name: 'Health', description: 'Health check endpoints' },
       { name: 'Auth', description: 'Public authentication (no API key required)' },
       { name: 'Session', description: 'WhatsApp session management' },
       { name: 'Messaging', description: 'Send messages (text, media, group, broadcast)' },
-      { name: 'Scheduled', description: 'Scheduled messages' },
-      { name: 'Groups', description: 'Group management' },
-      { name: 'Users', description: 'User management (admin only)' },
+      { name: 'Scheduled', description: 'Scheduled message management' },
+      { name: 'Groups', description: 'WhatsApp group management' },
     ],
     components: {
       securitySchemes: {
-        apiKey: {
-          type: 'apiKey' as const,
+        ApiKeyAuth: {
+          type: 'apiKey',
           name: 'x-api-key',
-          in: 'header' as const,
-          description: 'API key for authentication',
+          in: 'header',
+          description: 'API key for authentication. Get your API key by registering at /api/auth/register',
         },
       },
     },
-    security: [{ apiKey: [] }],
+    security: [{ ApiKeyAuth: [] }],
   },
 };
 
-export default { swaggerConfig, swaggerUiConfig };
+export default { swaggerConfig };

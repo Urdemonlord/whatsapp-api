@@ -32,6 +32,12 @@ import {
   cancelScheduledHandler,
   historyScheduledHandler,
 } from '../controllers/scheduleController';
+import { 
+  SessionSchemas, 
+  MessagingSchemas, 
+  ScheduledSchemas, 
+  GroupSchemas 
+} from '../config/routeSchemas';
 
 /**
  * Register session routes
@@ -48,76 +54,76 @@ export async function sessionRoutes(
   // ========================================
 
   // Create new session
-  fastify.post('/session/create', createSessionHandler);
+  fastify.post('/session/create', { schema: SessionSchemas.create }, createSessionHandler);
 
   // List all sessions
-  fastify.get('/sessions', listSessionsHandler);
+  fastify.get('/sessions', { schema: SessionSchemas.list }, listSessionsHandler);
 
   // Get session status
-  fastify.route({ method: 'GET', url: '/session/:sessionId/status', handler: getSessionStatusHandler });
+  fastify.get('/session/:sessionId/status', { schema: SessionSchemas.status }, getSessionStatusHandler);
 
   // Get QR code
-  fastify.route({ method: 'GET', url: '/session/:sessionId/qr', handler: getQrCodeHandler });
+  fastify.get('/session/:sessionId/qr', { schema: SessionSchemas.qr }, getQrCodeHandler);
 
   // Delete session
-  fastify.route({ method: 'DELETE', url: '/session/:sessionId', handler: deleteSessionHandler });
+  fastify.delete('/session/:sessionId', { schema: SessionSchemas.delete }, deleteSessionHandler);
 
   // Update webhook URL
-  fastify.route({ method: 'PUT', url: '/session/:sessionId/webhook', handler: updateWebhookHandler });
+  fastify.put('/session/:sessionId/webhook', { schema: SessionSchemas.updateWebhook }, updateWebhookHandler);
 
   // ========================================
   // MESSAGING
   // ========================================
 
   // Send message (text and/or media) to individual
-  fastify.route({ method: 'POST', url: '/session/:sessionId/send', handler: sendMessageHandler });
+  fastify.post('/session/:sessionId/send', { schema: MessagingSchemas.send }, sendMessageHandler);
 
   // Send message to group
-  fastify.route({ method: 'POST', url: '/session/:sessionId/send-group', handler: sendToGroupHandler });
+  fastify.post('/session/:sessionId/send-group', { schema: MessagingSchemas.sendGroup }, sendToGroupHandler);
 
   // Broadcast to multiple recipients
-  fastify.route({ method: 'POST', url: '/session/:sessionId/broadcast', handler: broadcastHandler });
+  fastify.post('/session/:sessionId/broadcast', { schema: MessagingSchemas.broadcast }, broadcastHandler);
 
   // ========================================
   // SCHEDULED MESSAGES
   // ========================================
 
   // Create scheduled message
-  fastify.route({ method: 'POST', url: '/session/:sessionId/schedule', handler: createScheduledHandler });
+  fastify.post('/session/:sessionId/schedule', { schema: ScheduledSchemas.create }, createScheduledHandler);
 
   // List pending scheduled messages
-  fastify.route({ method: 'GET', url: '/session/:sessionId/schedule', handler: listScheduledHandler });
+  fastify.get('/session/:sessionId/schedule', { schema: ScheduledSchemas.list }, listScheduledHandler);
 
   // Get scheduled message history
-  fastify.route({ method: 'GET', url: '/session/:sessionId/schedule/history', handler: historyScheduledHandler });
+  fastify.get('/session/:sessionId/schedule/history', { schema: ScheduledSchemas.history }, historyScheduledHandler);
 
   // Get specific scheduled message
-  fastify.route({ method: 'GET', url: '/session/:sessionId/schedule/:messageId', handler: getScheduledHandler });
+  fastify.get('/session/:sessionId/schedule/:messageId', { schema: ScheduledSchemas.get }, getScheduledHandler);
 
   // Cancel scheduled message
-  fastify.route({ method: 'DELETE', url: '/session/:sessionId/schedule/:messageId', handler: cancelScheduledHandler });
+  fastify.delete('/session/:sessionId/schedule/:messageId', { schema: ScheduledSchemas.cancel }, cancelScheduledHandler);
 
   // ========================================
   // GROUP MANAGEMENT
   // ========================================
 
   // List all groups
-  fastify.route({ method: 'GET', url: '/session/:sessionId/groups', handler: listGroupsHandler });
+  fastify.get('/session/:sessionId/groups', { schema: GroupSchemas.list }, listGroupsHandler);
 
   // Create new group
-  fastify.route({ method: 'POST', url: '/session/:sessionId/groups', handler: createGroupHandler });
+  fastify.post('/session/:sessionId/groups', { schema: GroupSchemas.create }, createGroupHandler);
 
   // Get group info
-  fastify.route({ method: 'GET', url: '/session/:sessionId/groups/:groupId', handler: getGroupInfoHandler });
+  fastify.get('/session/:sessionId/groups/:groupId', { schema: GroupSchemas.info }, getGroupInfoHandler);
 
   // Add participants to group
-  fastify.route({ method: 'POST', url: '/session/:sessionId/groups/:groupId/add', handler: addGroupParticipantsHandler });
+  fastify.post('/session/:sessionId/groups/:groupId/add', { schema: GroupSchemas.addParticipants }, addGroupParticipantsHandler);
 
   // Remove participants from group
-  fastify.route({ method: 'POST', url: '/session/:sessionId/groups/:groupId/remove', handler: removeGroupParticipantsHandler });
+  fastify.post('/session/:sessionId/groups/:groupId/remove', { schema: GroupSchemas.removeParticipants }, removeGroupParticipantsHandler);
 
   // Leave group
-  fastify.route({ method: 'DELETE', url: '/session/:sessionId/groups/:groupId', handler: leaveGroupHandler });
+  fastify.delete('/session/:sessionId/groups/:groupId', { schema: GroupSchemas.leave }, leaveGroupHandler);
 }
 
 export default sessionRoutes;

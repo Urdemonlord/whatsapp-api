@@ -139,14 +139,10 @@ export async function createSessionHandler(
       return;
     }
 
-    // Update webhook URL if provided
-    if (existingSession && webhook_url) {
-      existingSession.webhook_url = webhook_url;
-      await existingSession.save();
-    }
+    // Create session (handles creation or update of existing disconnected session)
 
     // Create session
-    const result = await createSession(sessionId, user.id);
+    const result = await createSession(sessionId, user.id, webhook_url);
 
     if (!result.success) {
       reply.status(500).send({

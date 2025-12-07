@@ -8,6 +8,7 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import { apiKeyAuth } from '../middleware/apiKeyAuth';
 import { adminOnly } from '../middleware/adminOnly';
+import { UserSchemas } from '../config/routeSchemas';
 import {
   createUserHandler,
   listUsersHandler,
@@ -33,7 +34,7 @@ export async function userRoutes(
   // ========================================
 
   // Get current user profile
-  fastify.get('/users/me', getMeHandler);
+  fastify.get('/users/me', { schema: UserSchemas.me }, getMeHandler);
 
   // ========================================
   // ADMIN ENDPOINTS (admin only)
@@ -43,6 +44,7 @@ export async function userRoutes(
   fastify.route({
     method: 'POST',
     url: '/users',
+    schema: UserSchemas.create,
     preHandler: adminOnly,
     handler: createUserHandler,
   });
@@ -51,6 +53,7 @@ export async function userRoutes(
   fastify.route({
     method: 'GET',
     url: '/users',
+    schema: UserSchemas.list,
     preHandler: adminOnly,
     handler: listUsersHandler,
   });
@@ -59,6 +62,7 @@ export async function userRoutes(
   fastify.route({
     method: 'GET',
     url: '/users/:userId',
+    schema: UserSchemas.get,
     preHandler: adminOnly,
     handler: getUserHandler,
   });
@@ -67,6 +71,7 @@ export async function userRoutes(
   fastify.route({
     method: 'PUT',
     url: '/users/:userId',
+    schema: UserSchemas.update,
     preHandler: adminOnly,
     handler: updateUserHandler,
   });
@@ -75,6 +80,7 @@ export async function userRoutes(
   fastify.route({
     method: 'DELETE',
     url: '/users/:userId',
+    schema: UserSchemas.delete,
     preHandler: adminOnly,
     handler: deleteUserHandler,
   });
@@ -83,6 +89,7 @@ export async function userRoutes(
   fastify.route({
     method: 'POST',
     url: '/users/:userId/regenerate-key',
+    schema: UserSchemas.regenerateKey,
     preHandler: adminOnly,
     handler: regenerateApiKeyHandler,
   });

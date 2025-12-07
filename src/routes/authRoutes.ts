@@ -6,6 +6,7 @@
 
 import { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } from 'fastify';
 import { User } from '../models/User';
+import { AuthSchemas } from '../config/routeSchemas';
 
 // Request body types
 interface RegisterBody {
@@ -173,10 +174,10 @@ export async function authRoutes(
   _options: FastifyPluginOptions
 ): Promise<void> {
   // Register new user
-  fastify.post('/auth/register', registerHandler);
+  fastify.post('/auth/register', { schema: AuthSchemas.register }, registerHandler);
 
   // Login
-  fastify.post('/auth/login', loginHandler);
+  fastify.post('/auth/login', { schema: AuthSchemas.login }, loginHandler);
 }
 
 export default authRoutes;
