@@ -1,6 +1,13 @@
+// IMPORTANT: reflect-metadata must be imported before any decorator usage
+import 'reflect-metadata';
+
 import { Sequelize } from 'sequelize-typescript';
 import { env } from './env';
-import path from 'path';
+
+// Import models explicitly
+import { User } from '../models/User';
+import { Session } from '../models/Session';
+import { AuthKey } from '../models/AuthKey';
 
 // Create Sequelize instance with MySQL
 export const sequelize = new Sequelize({
@@ -11,8 +18,8 @@ export const sequelize = new Sequelize({
   username: env.db.user,
   password: env.db.password,
 
-  // Models will be loaded from the models directory
-  models: [path.join(__dirname, '../models/**/*.{ts,js}')],
+  // Register models explicitly
+  models: [User, Session, AuthKey],
 
   // Logging configuration
   logging: env.isDev ? console.log : false,

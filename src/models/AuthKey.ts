@@ -5,11 +5,7 @@ import {
   DataType,
   PrimaryKey,
   AutoIncrement,
-  ForeignKey,
-  BelongsTo,
-  Index,
 } from 'sequelize-typescript';
-import { Session } from './Session';
 
 /**
  * AuthKey Model
@@ -18,11 +14,18 @@ import { Session } from './Session';
  * IMPORTANT: The 'value' column uses LONGTEXT because Baileys credentials
  * can be very large (especially for multi-device). Using TEXT or STRING
  * will cause data truncation and decryption errors.
+ * 
+ * NOTE: We use session_id as a string reference (not a FK) because
+ * AuthKey needs to reference Session.session_id (string), not Session.id (int)
  */
 @Table({
   tableName: 'auth_keys',
   timestamps: true,
   indexes: [
+    {
+      name: 'idx_session_id',
+      fields: ['session_id'],
+    },
     {
       name: 'idx_session_type',
       fields: ['session_id', 'type'],
@@ -36,8 +39,6 @@ export class AuthKey extends Model {
   @Column(DataType.INTEGER)
   declare id: number;
 
-  @Index('idx_session_id')
-  @ForeignKey(() => Session)
   @Column({
     type: DataType.STRING(100),
     allowNull: false,
@@ -69,10 +70,6 @@ export class AuthKey extends Model {
     comment: 'JSON-serialized auth data with Buffer support',
   })
   declare value: string;
-
-  // Relationship: AuthKey belongs to Session
-  @BelongsTo(() => Session, { foreignKey: 'session_id', targetKey: 'session_id' })
-  declare session: Session;
 
   /**
    * Get parsed value (with Buffer restoration)

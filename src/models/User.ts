@@ -4,11 +4,11 @@ import {
   Model,
   DataType,
   PrimaryKey,
-  Default,
   Unique,
   HasMany,
   BeforeCreate,
   BeforeUpdate,
+  BeforeValidate,
 } from 'sequelize-typescript';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
@@ -24,8 +24,10 @@ import { Session } from './Session';
 })
 export class User extends Model {
   @PrimaryKey
-  @Default(DataType.UUIDV4)
-  @Column(DataType.UUID)
+  @Column({
+    type: DataType.UUID,
+    defaultValue: DataType.UUIDV4,
+  })
   declare id: string;
 
   @Unique
@@ -44,7 +46,7 @@ export class User extends Model {
   @Unique
   @Column({
     type: DataType.STRING(64),
-    allowNull: false,
+    allowNull: true, // Allow null initially, will be set by hook
   })
   declare api_key: string;
 
@@ -62,27 +64,34 @@ export class User extends Model {
   declare sessions: Session[];
 
   /**
-   * Hook: Generate UUID and API key before creating user
+   * Hook: Generate UUID and API key BEFORE validation
    */
-  @BeforeCreate
-  static async generateDefaults(user: User): Promise<void> {
+  @BeforeValidate
+  static generateApiKey(user: User): void {
     if (!user.id) {
       user.id = uuidv4();
     }
     if (!user.api_key) {
       user.api_key = uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '');
     }
-    if (user.password) {
+  }
+
+  /**
+   * Hook: Hash password before creating user
+   */
+  @BeforeCreate
+  static async hashPassword(user: User): Promise<void> {
+    if (user.password && !user.password.startsWith('$2b$')) {
       user.password = await bcrypt.hash(user.password, 12);
     }
   }
 
   /**
-   * Hook: Hash password if changed
+   * Hook: Hash password if changed on update
    */
   @BeforeUpdate
   static async hashPasswordOnUpdate(user: User): Promise<void> {
-    if (user.changed('password')) {
+    if (user.changed('password') && !user.password.startsWith('$2b$')) {
       user.password = await bcrypt.hash(user.password, 12);
     }
   }

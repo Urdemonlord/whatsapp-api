@@ -1,0 +1,184 @@
+/**
+ * WhatsApp API Gateway
+ * 
+ * Main application entry point
+ */
+
+import 'reflect-metadata';
+import Fastify, { FastifyInstance } from 'fastify';
+import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import { env, validateEnv } from './config/env';
+import { initDatabase, closeDatabase } from './config/database';
+import { sessionRoutes } from './routes/sessionRoutes';
+import { restoreAllSessions, closeAllSessions } from './services/whatsappService';
+import { User } from './models/User';
+
+// Create Fastify instance
+const app: FastifyInstance = Fastify({
+  logger: {
+    level: env.logLevel,
+    transport: env.isDev
+      ? {
+          target: 'pino-pretty',
+          options: {
+            colorize: true,
+          },
+        }
+      : undefined,
+  },
+});
+
+/**
+ * Register plugins and routes
+ */
+async function registerPlugins(): Promise<void> {
+  // CORS
+  await app.register(cors, {
+    origin: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'x-api-key'],
+  });
+
+  // Security headers
+  await app.register(helmet, {
+    contentSecurityPolicy: false,
+  });
+
+  // Health check route (no auth required)
+  app.get('/health', async () => {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    };
+  });
+
+  // API info route
+  app.get('/', async () => {
+    return {
+      name: 'WhatsApp API Gateway',
+      version: '1.0.0',
+      documentation: '/docs',
+    };
+  });
+
+  // Register session routes under /api prefix
+  await app.register(sessionRoutes, { prefix: '/api' });
+}
+
+/**
+ * Create initial admin user if not exists
+ */
+async function seedDatabase(): Promise<void> {
+  try {
+    const userCount = await User.count();
+
+    if (userCount === 0) {
+      const adminUser = await User.create({
+        username: 'admin',
+        password: 'admin123', // Will be hashed by model hook
+      });
+
+      console.log('='.repeat(60));
+      console.log('🔐 INITIAL ADMIN USER CREATED');
+      console.log('='.repeat(60));
+      console.log(`Username: admin`);
+      console.log(`Password: admin123`);
+      console.log(`API Key:  ${adminUser.api_key}`);
+      console.log('='.repeat(60));
+      console.log('⚠️  Please change the password after first login!');
+      console.log('='.repeat(60));
+    }
+  } catch (error) {
+    console.error('Error seeding database:', error);
+  }
+}
+
+/**
+ * Start the server
+ */
+async function start(): Promise<void> {
+  try {
+    // Validate environment
+    validateEnv();
+
+    // Initialize database
+    await initDatabase();
+
+    // Seed database with initial data
+    await seedDatabase();
+
+    // Register plugins and routes
+    await registerPlugins();
+
+    // Restore existing sessions
+    await restoreAllSessions();
+
+    // Start server
+    const address = await app.listen({
+      port: env.port,
+      host: env.host,
+    });
+
+    console.log('');
+    console.log('🚀 WhatsApp API Gateway is running!');
+    console.log(`📍 Server: ${address}`);
+    console.log(`🔧 Environment: ${env.nodeEnv}`);
+    console.log('');
+    console.log('API Endpoints:');
+    console.log(`  POST   ${address}/api/session/create`);
+    console.log(`  GET    ${address}/api/sessions`);
+    console.log(`  GET    ${address}/api/session/:id/status`);
+    console.log(`  GET    ${address}/api/session/:id/qr`);
+    console.log(`  DELETE ${address}/api/session/:id`);
+    console.log(`  POST   ${address}/api/session/:id/send`);
+    console.log('');
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+/**
+ * Graceful shutdown
+ */
+async function shutdown(): Promise<void> {
+  console.log('\n🛑 Shutting down gracefully...');
+
+  try {
+    // Close all WhatsApp sessions
+    await closeAllSessions();
+
+    // Close server
+    await app.close();
+
+    // Close database
+    await closeDatabase();
+
+    console.log('👋 Goodbye!');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+    process.exit(1);
+  }
+}
+
+// Handle shutdown signals
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
+// Handle uncaught errors
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  shutdown();
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Start the application
+start();
+
+export default app;

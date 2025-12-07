@@ -8,12 +8,9 @@ import {
   Unique,
   ForeignKey,
   BelongsTo,
-  HasMany,
   Default,
-  Index,
 } from 'sequelize-typescript';
 import { User } from './User';
-import { AuthKey } from './AuthKey';
 
 /**
  * Session Status Enum
@@ -33,6 +30,13 @@ export enum SessionStatus {
 @Table({
   tableName: 'sessions',
   timestamps: true,
+  indexes: [
+    {
+      name: 'idx_session_id',
+      fields: ['session_id'],
+      unique: true,
+    },
+  ],
 })
 export class Session extends Model {
   @PrimaryKey
@@ -41,7 +45,6 @@ export class Session extends Model {
   declare id: number;
 
   @Unique
-  @Index
   @Column({
     type: DataType.STRING(100),
     allowNull: false,
@@ -101,9 +104,8 @@ export class Session extends Model {
   @BelongsTo(() => User)
   declare user: User;
 
-  // Relationship: Session has many AuthKeys
-  @HasMany(() => AuthKey)
-  declare auth_keys: AuthKey[];
+  // NOTE: AuthKey relationship removed - AuthKey uses session_id as string reference
+  // not as a foreign key (due to type mismatch: session_id is string, id is integer)
 
   /**
    * Check if session is active
