@@ -37,6 +37,14 @@ export class User extends Model {
   })
   declare username: string;
 
+  @Unique
+  @Column({
+    type: DataType.STRING(255),
+    allowNull: true,
+    comment: 'User email address',
+  })
+  declare email: string;
+
   @Column({
     type: DataType.STRING(255),
     allowNull: false,
@@ -55,6 +63,13 @@ export class User extends Model {
     defaultValue: true,
   })
   declare is_active: boolean;
+
+  @Column({
+    type: DataType.ENUM('admin', 'user'),
+    defaultValue: 'user',
+    comment: 'User role for access control',
+  })
+  declare role: 'admin' | 'user';
 
   @Column(DataType.DATE)
   declare last_login: Date;
