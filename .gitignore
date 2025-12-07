@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Auth files (should be in DB, but just in case)
+auth_info/
+auth_info_baileys/
+*.session
+
+# Test
+coverage/
+.nyc_output/
+
+# Misc
+*.tmp
+*.temp
