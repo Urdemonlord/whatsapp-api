@@ -96,6 +96,30 @@ export function getSession(sessionId: string): WASocket | undefined {
   return sessions.get(sessionId);
 }
 
+export async function markMessageRead(sessionId: string, remoteJid: string, messageId: string): Promise<void> {
+  const socket = sessions.get(sessionId);
+  if (!socket?.user) {
+    throw new Error('Session not connected');
+  }
+
+  await socket.readMessages([
+    {
+      remoteJid,
+      id: messageId,
+      fromMe: false,
+    },
+  ]);
+}
+
+export async function sendPresence(sessionId: string, remoteJid: string, presence: 'composing' | 'paused'): Promise<void> {
+  const socket = sessions.get(sessionId);
+  if (!socket?.user) {
+    throw new Error('Session not connected');
+  }
+
+  await socket.sendPresenceUpdate(presence, remoteJid);
+}
+
 /**
  * Create a new WhatsApp session
  */
